@@ -329,8 +329,9 @@ func (cli *Client) SetProxyAddress(addr string, opts ...SetProxyOptions) error {
 		cli.SetProxy(http.ProxyURL(parsed), opts...)
 	} else if parsed.Scheme == "socks5" {
 		px, err := proxy.FromURL(parsed, &net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
+			Timeout: 30 * time.Second,
+			// Los proxies residenciales pueden cortar túneles inactivos a los 10 s.
+			KeepAlive: 5 * time.Second,
 		})
 		if err != nil {
 			return err
@@ -371,6 +372,11 @@ func (cli *Client) SetProxy(proxy Proxy, opts ...SetProxyOptions) {
 	}
 	transport := (http.DefaultTransport.(*http.Transport)).Clone()
 	transport.Proxy = proxy
+	// Mismo motivo que en SOCKS5: mantener vivo el túnel si el proxy corta por inactividad.
+	transport.DialContext = (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 5 * time.Second,
+	}).DialContext
 	cli.setTransport(transport, opt)
 }
 
